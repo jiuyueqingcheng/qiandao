@@ -1,4 +1,0 @@
-#!name=NodeLoc签到
-#!desc=每天08:00签到；Cookie抓取请单独启用NodeLoc Cookie模块
-[Script]
-NodeLoc签到 = type=cron,cronexp="0 8 * * *",timeout=60,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/nodeloc/qiandao.js
