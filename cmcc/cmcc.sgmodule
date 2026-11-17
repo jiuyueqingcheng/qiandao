@@ -1,0 +1,13 @@
+#!name=中国移动每日签到
+#!desc=中国移动App签到赢好礼，自动续登、签到及查询积分。抓取成功后关闭抓取参数，模块保持开启。需先上传配套cmcc.js。
+#!arguments=签到执行时间:20 8 * * *,开启Cookie抓取:true
+#!arguments-desc=签到执行时间：默认每天08:20，使用五字段cron，按Surge调度时区执行。\n\n开启Cookie抓取：true允许保存登录凭证及签到标识；false停止抓取，不清除已存凭据，不影响定时任务。\n\n首次抓取：先在后台划掉中国移动App，再重新打开已登录的App，进入“签到赢好礼”并手动点一次签到。收到获取成功通知后可将开关设为false。仅切回App可能不会触发登录抓取。\n\n支持沿用上游多账号流程，每个账号分别冷启动抓取。App升级或登录失效时重新抓取。需开启MITM并信任Surge证书。\n\n请先把配套cmcc.js上传至jiuyueqingcheng/qiandao仓库的cmcc/cmcc.js；上游原版不支持ENABLE_CAPTURE开关。
+
+[Script]
+中国移动登录凭证 = type=http-request,pattern=^https:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/[LD]N\/uam(onekey|randcode)login\/autoLogin,requires-body=true,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/cmcc/cmcc.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+中国移动积分请求 = type=http-request,pattern=^https:\/\/clientaccess\.10086\.cn\/biz-orange\/BN\/scoreQueryService\/getScoreQuery,requires-body=true,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/cmcc/cmcc.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+中国移动签到标识 = type=http-request,pattern=^https:\/\/h5\.bj\.10086\.cn\/ActSignIn2023\/doPrize,requires-body=false,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/cmcc/cmcc.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+中国移动签到 = type=cron,cronexp="{{{签到执行时间}}}",timeout=60,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/cmcc/cmcc.js
+
+[MITM]
+hostname = %APPEND% client.app.coc.10086.cn, clientaccess.10086.cn, h5.bj.10086.cn
