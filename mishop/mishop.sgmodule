@@ -1,0 +1,11 @@
+#!name=小米商城米金签到
+#!desc=小米商城App米金每日签到。首次开启抓取，在App首页进入米金商城并点一次签到；保存成功后关闭抓取参数，模块保持开启。需先上传配套脚本。
+#!arguments=签到执行时间:15 8 * * *,开启Cookie抓取:true
+#!arguments-desc=签到执行时间：默认每天08:15，使用五字段cron，按Surge调度时区执行。\n\n开启Cookie抓取：\ntrue：允许保存登录Cookie、账号和设备请求头。\nfalse：停止抓取，不删除已保存凭据，不影响定时签到。\n\n抓取步骤：打开小米商城App→首页→米金商城→手动点击一次签到；已签到也可点击以触发抓取请求。收到获取成功通知后设为false。\n\n需开启MITM并安装信任Surge证书。Cookie过期时重新开启抓取并登录操作。\n\n请先把配套cookie.js、qiandao.js上传至jiuyueqingcheng/qiandao仓库的mishop目录；上游原版捕获脚本不支持此开关。
+
+[Script]
+小米商城 Cookie = type=http-request,pattern=^https:\/\/shop-api\.retail\.mi\.com\/mtop\/mf\/act\/infinite\/(do|done),requires-body=false,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/mishop/cookie.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+小米商城签到 = type=cron,cronexp="{{{签到执行时间}}}",timeout=60,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/mishop/qiandao.js
+
+[MITM]
+hostname = %APPEND% shop-api.retail.mi.com
