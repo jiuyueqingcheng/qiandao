@@ -1,0 +1,11 @@
+#!name=WPS 每日签到与福利任务
+#!desc=WPS每日签到、福利中心试用和抽奖、小程序打卡等。首次开启抓取，进入WPS任意活动页；成功后关闭抓取开关。
+#!arguments=签到执行时间:0 10 * * *,开启Cookie抓取:true
+#!arguments-desc=签到执行时间：默认每天10:00执行，抢限量活动并顺序处理其余福利任务，采用五字段cron，按Surge调度时区执行。\n\n开启Cookie抓取：\ntrue：允许保存WPS登录态 wps_sid。\nfalse：停止抓取，不删除已保存登录态，不影响签到。\n\n首次使用请开启抓取，打开WPS App并进入任意活动页（任务中心/福利中心，如“天天领福利”），等待请求触发。收到Cookie获取成功通知后将开关设为false。\n\n需开启MITM并信任Surge证书。登录态通常长效；若手动退出、改密或异地风控后失效，请重新开启抓取。\n\n请先将配套 cookie.js、wps.js 上传至 jiuyueqingcheng/qiandao 仓库的 wps/ 目录。cookie.js 已加入 ENABLE_CAPTURE 开关；上游原脚本不识别此参数。BoxJS任务键未配置时各任务默认开启。
+
+[Script]
+WPS Cookie = type=http-request,pattern=^https:\/\/personal-act\.wps\.cn\/activity-rubik\/activity\/page_info,requires-body=false,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/wps/cookie.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+WPS签到 = type=cron,cronexp="{{{签到执行时间}}}",timeout=120,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/wps/wps.js
+
+[MITM]
+hostname = %APPEND% personal-act.wps.cn
