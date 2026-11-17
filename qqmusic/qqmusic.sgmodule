@@ -1,13 +1,18 @@
 #!name=QQ音乐每日任务
 #!desc=绿钻成长值、金币签到、每日任务、定时金币和红包雨。首次开启抓取，在QQ音乐App进入会员中心及金币中心每日签到；保存后将抓取开关改为false。需先上传配套qqmusic.js。
-#!arguments=每日任务时间:30 7 * * *,定时金币时间:* 9-10 * * *,红包雨时间:5 0,8,12,16,20,22 * * *,开启Cookie抓取:true
-#!arguments-desc=每日任务时间：默认每天07:30，负责凭证续期、签到、每日任务和免费抽奖。\n\n定时金币时间：默认09–10点每分钟唤醒；脚本按服务端进度判断是否请求，未到时间仅本地退出。\n\n红包雨时间：默认00:05、08:05、12:05、16:05、20:05、22:05。\n\n开启Cookie抓取：true允许抓取，false停止保存凭据。收到获取成功通知后可设为false，整个模块保持开启。\n\n首次使用请进入QQ音乐App→我的→会员中心，再进入金币中心→每日签到。需开启MITM并信任证书。\n\n配套脚本须上传至jiuyueqingcheng/qiandao仓库的qqmusic/qqmusic.js；上游原版不识别抓取开关。脚本含临时收藏/关注任务，领奖后尝试恢复原状态。所有时间使用五字段cron，按Surge调度时区执行。
+#!arguments=每日任务时间:30 7 * * *,定时金币时间:* 9-10 * * *,开启Cookie抓取:true
+#!arguments-desc=每日任务时间：默认每天07:30，负责凭证续期、签到、每日任务和免费抽奖。\n\n定时金币时间：默认09–10点每分钟唤醒；脚本按服务端进度判断是否请求，未到时间仅本地退出。\n\n红包雨：使用六条独立cron，分别在00:05、08:05、12:05、16:05、20:05、22:05执行。避免小时列表的逗号与模块参数分隔符冲突；如需调整，在模块内容中修改对应cron。\n\n开启Cookie抓取：true允许抓取，false停止保存凭据。收到获取成功通知后可设为false，整个模块保持开启。\n\n首次使用请进入QQ音乐App→我的→会员中心，再进入金币中心→每日签到。需开启MITM并信任证书。\n\n配套脚本须上传至jiuyueqingcheng/qiandao仓库的qqmusic/qqmusic.js；上游原版不识别抓取开关。脚本含临时收藏/关注任务，领奖后尝试恢复原状态。所有时间使用五字段cron，按Surge调度时区执行。
 
 [Script]
 QQ音乐 Cookie = type=http-request,pattern=^https:\/\/u6\.y\.qq\.com\/cgi-bin\/musics\.fcg\?.*(EveryDaySignLvzScore|GetSignInSummary),requires-body=true,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
 QQ音乐每日任务 = type=cron,cronexp="{{{每日任务时间}}}",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
 QQ音乐定时金币 = type=cron,cronexp="{{{定时金币时间}}}",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
-QQ音乐红包雨 = type=cron,cronexp="{{{红包雨时间}}}",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨00点 = type=cron,cronexp="5 0 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨08点 = type=cron,cronexp="5 8 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨12点 = type=cron,cronexp="5 12 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨16点 = type=cron,cronexp="5 16 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨20点 = type=cron,cronexp="5 20 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
+QQ音乐红包雨22点 = type=cron,cronexp="5 22 * * *",timeout=1200,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/qqmusic/qqmusic.js
 
 [MITM]
 hostname = %APPEND% u6.y.qq.com
