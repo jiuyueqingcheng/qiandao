@@ -1,0 +1,11 @@
+#!name=海底捞每日签到
+#!desc=微信小程序海底捞签到。首次开启抓取，在微信小程序进入我的并打开签到入口；保存成功后将抓取开关改为false。需先上传配套脚本。
+#!arguments=签到执行时间:23 7 * * *,开启Cookie抓取:true
+#!arguments-desc=签到执行时间：默认每天07:23执行，使用五字段cron，按Surge调度时区执行。\n\n开启Cookie抓取：\ntrue：允许保存海底捞小程序登录Token。\nfalse：停止抓取，不删除已保存Token，不影响定时签到。\n\n首次使用：在微信打开“海底捞”小程序→进入“我的”→任意签到入口，触发签到接口。收到Cookie获取成功通知后将开关改为false。\n\n需开启MITM并信任Surge证书。Token失效时重新开启抓取并在小程序触发请求。\n\n请先将配套haidilao.js上传至jiuyueqingcheng/qiandao仓库的haidilao/haidilao.js；上游原版不读取ENABLE_CAPTURE参数。
+
+[Script]
+海底捞 Cookie = type=http-request,pattern=^https:\/\/superapp-public\.kiwa-tech\.com\/activity\/wxapp\/signin\/(query|querySite|querySwitch|queryFragment|signin),requires-body=false,max-size=0,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/haidilao/haidilao.js,argument="{\"ENABLE_CAPTURE\":{{{开启Cookie抓取}}}}"
+海底捞签到 = type=cron,cronexp="{{{签到执行时间}}}",timeout=60,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/haidilao/haidilao.js
+
+[MITM]
+hostname = %APPEND% superapp-public.kiwa-tech.com
