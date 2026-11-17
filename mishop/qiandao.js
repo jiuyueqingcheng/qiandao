@@ -1,0 +1,309 @@
+/**
+ * 小米商城 · 米金签到(每日 +5 米金,连签 2/7/14 天阶段红包)
+ *
+ * 抓取:打开小米商城 APP → 首页「米金商城」→ 进活动页点签到,抓 Cookie
+ * 签到:cron 定时自动签到
+ *
+ * @Author: MaYIHEI <https://github.com/MaYIHEI/paperclip>
+ * @Channel: Telegram 频道 https://t.me/mayihei
+ * @Updated: 2026-10-28
+ *
+ * ===== Loon =====
+ * [MITM]
+ * hostname = shop-api.retail.mi.com
+ * [Script]
+ * request if ${url} ~= /^https:\/\/shop-api\.retail\.mi\.com\/mtop\/mf\/act\/infinite\/(do|done)/i then script("https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.cookie.js") with tag="小米商城 Cookie", img_url="https://raw.githubusercontent.com/MaYIHEI/pin/refs/heads/main/app/mishop.png"
+ * cron "15 8 * * *" then script("https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.js") with tag="小米商城签到", img_url="https://raw.githubusercontent.com/MaYIHEI/pin/refs/heads/main/app/mishop.png"
+ *
+ * ===== Surge =====
+ * [MITM]
+ * hostname = %APPEND% shop-api.retail.mi.com
+ * [Script]
+ * 小米商城 Cookie = type=http-request,pattern=^https:\/\/shop-api\.retail\.mi\.com\/mtop\/mf\/act\/infinite\/(do|done),requires-body=false,max-size=0,script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.cookie.js,img-url=https://raw.githubusercontent.com/MaYIHEI/pin/refs/heads/main/app/mishop.png
+ * 小米商城签到 = type=cron,cronexp=15 8 * * *,timeout=60,script-path=https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.js,img-url=https://raw.githubusercontent.com/MaYIHEI/pin/refs/heads/main/app/mishop.png
+ *
+ * ===== Quantumult X =====
+ * [MITM]
+ * hostname = shop-api.retail.mi.com
+ * [rewrite_local]
+ * ^https:\/\/shop-api\.retail\.mi\.com\/mtop\/mf\/act\/infinite\/(do|done) url script-request-header https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.cookie.js
+ * [task_local]
+ * 15 8 * * * https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.js, tag=小米商城签到, img-url=https://raw.githubusercontent.com/MaYIHEI/pin/refs/heads/main/app/mishop.png, enabled=true
+ *
+ * ===== Stash =====
+ * cron:
+ *   script:
+ *     - name: 小米商城签到
+ *       cron: '15 8 * * *'
+ *       timeout: 60
+ * http:
+ *   mitm:
+ *     - "shop-api.retail.mi.com"
+ *   script:
+ *     - match: ^https:\/\/shop-api\.retail\.mi\.com\/mtop\/mf\/act\/infinite\/(do|done)
+ *       name: 小米商城 Cookie
+ *       type: request
+ *       require-body: false
+ * script-providers:
+ *   小米商城签到:
+ *     url: https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/app/mishop/mishop.js
+ *     interval: 86400
+ */
+
+const $ = new Env('小米商城');
+
+// 签到合集开启「统一通知」时不单独弹通知,结果由签到汇总统一发送
+$.merge = typeof $argument === "object" && !!$argument && $argument.merge === true;
+if ($.merge) $.msg = (...a) => console.log(a.filter((x) => typeof x === "string" && x).join("\n"));
+
+// 补签入口:请求 http://1.1.1.1/checkin/mishop 时现跑一次签到,跑完把本脚本的签到状态作为响应返回
+const CHECKIN_RUN = typeof $request !== 'undefined' && /^http:\/\/1\.1\.1\.1\/checkin\//.test($request.url);
+if (CHECKIN_RUN) { const end = $.done.bind($); $.done = () => end({ response: { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: $.getdata('mishop_status') || '{}' } }); }
+
+const SCRIPT_VERSION = "2026-10-28.r3"; // 改一次 +1,确认拉到最新版
+$.log(`[INFO] 脚本版本 ${SCRIPT_VERSION}`);
+
+const CK_KEY = 'mishop_data';
+const API = 'https://shop-api.retail.mi.com';
+
+// 米金签到任务常量 (从 /mtop/navi/venue/page?page_id=13880 响应里挖出, endTime 到 2027 年)
+const ACT_ID    = '6706c0695404a23dfb5b2cab';
+const TASK_ID   = '6706c0695243011f230d465d';
+const TASK_TYPE = 110;
+
+if (JSON.parse($.getdata("mishop_clear") || "false")) {
+    $.setdata("", CK_KEY);
+    $.setdata("false", "mishop_clear");
+    $.msg($.name, "", "✅ Cookie 已清除，请重新抓取");
+    $.done();
+} else {
+(async () => {
+    const raw = $.getdata(CK_KEY);
+    if (!raw) {
+        saveStatus('none', '未抓取 Cookie');
+        $.msg($.name, '🚫 缺少 Cookie',
+            '请先开启 cookie 抓取脚本,然后打开小米商城 APP → 首页 → 米金商城');
+        $.done();
+        return;
+    }
+
+    let ck;
+    try {
+        ck = JSON.parse(raw);
+    } catch (e) {
+        saveStatus('cookie', 'Cookie 解析失败');
+        $.msg($.name, '🚫 Cookie 解析失败', '请清空缓存重抓');
+        $.done();
+        return;
+    }
+
+    if (!ck.cookie) {
+        saveStatus('cookie', 'Cookie 不完整');
+        $.msg($.name, '🚫 Cookie 不完整', '缺 cookie 字段,请重抓');
+        $.done();
+        return;
+    }
+
+    const userId = ck.userId || '未知';
+    $.log(`▶️ 开始签到 userId=${userId}`);
+
+    try {
+        // 1. 调 infinite/do 拿 taskToken
+        const r1 = await post('/mtop/mf/act/infinite/do', ck, [
+            {},
+            { taskId: TASK_ID, actId: ACT_ID }
+        ]);
+
+        if (!r1) {
+            saveStatus('fail', '请求异常');
+            $.msg($.name, `❌ ${userId} 签到失败`, '请求异常,请查看日志');
+            $.done();
+            return;
+        }
+
+        // 已签判断: code !== 0 且消息里有 "已" / "重复" / "完成"
+        const r1msg = r1.message || r1.msg || '';
+        if (r1.code !== 0 || !r1.data || !r1.data.taskToken) {
+            if (/已|重复|完成|done/i.test(r1msg)) {
+                saveStatus('ok', '今日已签');
+                $.msg($.name, `✨ ${userId} 今日已签`, r1msg);
+            } else {
+                saveStatus('fail', `code=${r1.code} ${r1msg}`);
+                $.msg($.name, `❌ ${userId} 签到失败`, `code=${r1.code} ${r1msg}`);
+                debug(`do raw: ${JSON.stringify(r1).slice(0, 400)}`);
+            }
+            $.done();
+            return;
+        }
+
+        const taskToken = r1.data.taskToken;
+        debug(`do 拿到 taskToken=${taskToken.slice(-10)}`);
+
+        // 2. 调 infinite/done 领奖
+        const r2 = await post('/mtop/mf/act/infinite/done', ck, [
+            {},
+            { taskToken: taskToken, actId: ACT_ID, taskType: TASK_TYPE }
+        ]);
+
+        if (!r2 || r2.code !== 0) {
+            const m = (r2 && (r2.message || r2.msg)) || '响应异常';
+            saveStatus('fail', `领奖失败 ${m}`);
+            $.msg($.name, `⚠️ ${userId} 领奖失败`, `code=${r2 && r2.code} ${m}`);
+            debug(`done raw: ${JSON.stringify(r2).slice(0, 400)}`);
+            $.done();
+            return;
+        }
+
+        // 解析奖励
+        const awardList = (r2.data && r2.data.awardList) || [];
+        const doneInSeries = r2.data && r2.data.taskInfo && r2.data.taskInfo.doneInSeriesCount;
+
+        let awards = [];
+        for (const a of awardList) {
+            const name = a.awardName || a.customAwardName || '奖励';
+            const val = a.awardValue;
+            // conditionType=1 是当日基础奖, conditionType=4 是连签阶段奖
+            const tag = a.conditionType === 4 ? '🎁阶段奖' : '';
+            awards.push(`${tag}+${val} ${name}`);
+        }
+
+        const body = awards.length
+            ? `${awards.join(' · ')}${doneInSeries ? ` · 连签 ${doneInSeries} 天` : ''}`
+            : `连签 ${doneInSeries || '?'} 天`;
+
+        $.log(`✅ ${body}`);
+        saveStatus('ok', body);
+        $.msg($.name, `✅ ${userId} 签到成功`, body);
+    } catch (e) {
+        $.log(`❌ 异常: ${e.message || e}`);
+        saveStatus('fail', String(e.message || e));
+        $.msg($.name, `❌ ${userId} 签到异常`, String(e.message || e));
+    }
+
+    $.done();
+})();
+}
+
+// 发 POST 请求, body 是 JSON 数组(小米商城 mtop 接口惯例: [{}, {payload}])
+function post(path, ck, bodyArr) {
+    return new Promise((resolve) => {
+        const opts = {
+            url: API + path,
+            headers: buildHeaders(ck),
+            body: JSON.stringify(bodyArr),
+        };
+        $.post(opts, (err, resp, data) => {
+            if (err) {
+                debug(`[${path}] 错误: ${JSON.stringify(err)}`);
+                resolve(null);
+                return;
+            }
+            try {
+                resolve(JSON.parse(data));
+            } catch (e) {
+                debug(`[${path}] 响应解析失败 status=${resp && resp.statusCode}: ${(data || '').slice(0, 300)}`);
+                resolve(null);
+            }
+        });
+    });
+}
+
+function buildHeaders(ck) {
+    const h = {
+        'Content-Type': 'application/json',
+        'Accept': '*/*',
+        'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
+        'User-Agent': ck.ua || 'MiShop/2604270937 CFNetwork/3860.200.71 Darwin/25.1.0',
+        'x-user-agent': 'channel/mishop platform/mishop.ios',
+        'equipmenttype': '2',
+        'priority': 'u=3, i',
+        'cookie': ck.cookie,
+    };
+    if (ck.dId) h['d-id'] = ck.dId;
+    if (ck.dModel) h['d-model'] = ck.dModel;
+    return h;
+}
+
+// 记录本次结果,供「签到汇总」:ok 正常 / cookie 需重新抓取 / fail 其他失败 / none 未使用
+function saveStatus(s, msg) {
+    msg = String(msg).slice(0, 100);
+    // 服务器明确提示登录过期的失败,按需要重新抓取处理
+    if (s === 'fail' && /过期|重新登录|未登录|请登录|登录失效|登录已失效|token\s*(失效|过期|无效)|not\s*login/i.test(msg)) s = 'cookie';
+    // 同一天已有带奖励的成功记录时,再次运行得到的「今日已签」不覆盖它的奖励文字,只合并本次的资产等信息
+    let keep = null;
+    if (s === 'ok' && /^今日已/.test(msg)) {
+        const day = (t) => new Date(t + 8 * 3600 * 1000).toISOString().slice(0, 10);
+        let old = null;
+        try { old = JSON.parse($.getdata('mishop_status') || 'null'); } catch (e) {}
+        if (old && old.s === 'ok' && !/^今日已/.test(old.msg) && day(old.t) === day(Date.now())) keep = old;
+    }
+    checkinReport('mishop_status', keep ? keepReward(keep, { s, msg }) : { s, msg }, { name: '小米商城', author: 'MaYIHEI', run: 'http://1.1.1.1/checkin/mishop', open: 'https://apps.apple.com/app/id1024958046' });
+}
+
+// @Chavy Env
+// 调试日志:BoxJS 设 mishop_debug=true 才打印接口原始响应
+function debug(content) {
+    if (($.getdata("mishop_debug") || "false") !== "true") return;
+    $.log(`[DEBUG] ${typeof content === "string" ? content : JSON.stringify(content)}`);
+}
+
+// 保留当天带奖励的旧记录(状态、奖励文字、时间),合并本次拿到的资产、过期时间等;本次没有的沿用旧值
+function keepReward(old, rec) {
+    const out = { s: old.s, msg: old.msg, t: old.t, asset: old.asset, exp: old.exp };
+    for (const k in rec) if (rec[k] !== undefined && k !== 's' && k !== 'msg') out[k] = rec[k];
+    return out;
+}
+
+// 签到状态协议 v1:写本次结果,并把自己登记进公共索引 checkin_registry(Loon/Surge/QX/Stash 通用,不依赖 Env)
+function checkinReport(key, rec, info) {
+    const read = (k) => (typeof $prefs !== 'undefined' ? $prefs.valueForKey(k) : $persistentStore.read(k));
+    const write = (v, k) => (typeof $prefs !== 'undefined' ? $prefs.setValueForKey(v, k) : $persistentStore.write(v, k));
+    const registry = () => { try { return JSON.parse(read('checkin_registry') || '{}') || {}; } catch (e) { return {}; } };
+    write(JSON.stringify(Object.assign({ v: 1, t: Date.now(), name: info.name, author: info.author }, rec)), key);
+    const reg = registry();
+    if (JSON.stringify(reg[key]) === JSON.stringify(info)) return;
+    reg[key] = info;
+    write(JSON.stringify(reg), 'checkin_registry');
+    if (!registry()[key]) console.log(`[checkin] ${key} 登记没写上,下次运行再补`);
+}
+
+function Env(s) {
+    this.name = s;
+    this.isSurge = () => typeof $httpClient !== 'undefined';
+    this.isQuanX = () => typeof $task !== 'undefined';
+    this.isLoon = () => typeof $loon !== 'undefined';
+    this.log = (...a) => console.log(a.join('\n'));
+    this.msg = (t = this.name, s = '', b = '') => {
+        if (this.isSurge() || this.isLoon()) $notification.post(t, s, b);
+        else if (this.isQuanX()) $notify(t, s, b);
+        console.log(['', '====📣' + t + '====', s, b].filter(Boolean).join('\n'));
+    };
+    this.getdata = (k) => {
+        if (this.isSurge() || this.isLoon()) return $persistentStore.read(k);
+        if (this.isQuanX()) return $prefs.valueForKey(k);
+        return null;
+    };
+    this.setdata = (v, k) => {
+        if (this.isSurge() || this.isLoon()) return $persistentStore.write(v, k);
+        if (this.isQuanX()) return $prefs.setValueForKey(v, k);
+        return false;
+    };
+    this.get = (req, cb) => this.send(req, 'GET', cb);
+    this.post = (req, cb) => this.send(req, 'POST', cb);
+    this.send = (req, method, cb) => {
+        if (this.isSurge() || this.isLoon()) {
+            const fn = method === 'POST' ? $httpClient.post : $httpClient.get;
+            fn(req, (err, resp, data) => {
+                if (resp) { resp.body = data; resp.statusCode = resp.status || resp.statusCode; }
+                cb(err, resp, data);
+            });
+        } else if (this.isQuanX()) {
+            req.method = method;
+            $task.fetch(req).then(
+                (r) => { r.status = r.statusCode; cb(null, r, r.body); },
+                (e) => cb(e.error || e, null, null)
+            );
+        }
+    };
+    this.done = (v = {}) => { if (typeof $done !== 'undefined') $done(v); };
+}
