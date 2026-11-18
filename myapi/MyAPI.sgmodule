@@ -1,0 +1,7 @@
+#!name=My API 每日签到
+#!desc=按AgentRouter账号密码参数风格自动登录、续期会话并签到。仅适用于myapi.286600.xyz。首次运行会在Surge持久化存储中保存轮换refresh cookie。
+#!arguments=签到执行时间:0 9 * * *,账号或邮箱:,密码:,调试模式:false
+#!arguments-desc=签到执行时间：默认每天09:00，五字段cron，按Surge调度时区执行。\n\n账号或邮箱：填写myapi.286600.xyz登录账号。\n\n密码：填写网站登录密码。模块参数属于敏感配置，请勿分享含密码的模块文件或截图。\n\n调试模式：默认false。开启时只记录请求步骤和状态，不记录凭据。\n\n首次运行使用账号密码登录并保存refresh cookie到Surge持久化存储；后续任务会续期access token和轮换refresh cookie，再调用签到接口。退出网站、改密、撤销会话或长期过期后可能需要重新登录。若站点开启Turnstile、两步验证、密码加密或其他登录挑战，脚本不会绕过，可能无法自动登录。请勿将模型API Key当作登录凭据。
+
+[Script]
+My API签到 = type=cron,cronexp="{{{签到执行时间}}}",timeout=45,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/myapi/agentrouter.js,argument="{\"username\":\"{{{账号或邮箱}}}\",\"password\":\"{{{密码}}}\",\"debug\":{{{调试模式}}}}"
