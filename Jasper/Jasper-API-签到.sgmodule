@@ -1,0 +1,6 @@
+#!name=Jasper API 每日签到
+#!desc=自动登录 api.yjs.im 并执行每日签到，通知签到结果与账户额度。
+#!arguments=username,password
+
+[Script]
+Jasper API 签到 = type=cron,cronexp="0 9 * * *",timeout=60,script-path=https://raw.githubusercontent.com/jiuyueqingcheng/qiandao/refs/heads/main/Jasper/yjsim-checkin.js,argument="username={{{username}}}&password={{{password}}}"
